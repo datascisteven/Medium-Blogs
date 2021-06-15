@@ -1,12 +1,20 @@
-from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score, auc, average_precision_score, roc_auc_score
+from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score, average_precision_score, roc_auc_score
 from collections import Counter
 
 def auc(X, y, model):
     probs = model.predict_proba(X)[:,1] 
     return roc_auc_score(y, probs)
 
+def auc2(X, y, model):
+    probs = model.decision_function(X)
+    return roc_auc_score(y, probs)
+
 def aps(X, y, model):
     probs = model.predict_proba(X)[:,1]
+    return average_precision_score(y, probs)
+
+def aps2(X, y, model):
+    probs = model.decision_function(X)
     return average_precision_score(y, probs)
 
 def get_metric(X, y, y_pred, model):
@@ -16,7 +24,7 @@ def get_metric(X, y, y_pred, model):
 
         Need to enter X_valid, y_valid, y_pred, and model
     """
-    ac_val= accuracy_score(y, y_pred)
+    ac_val = accuracy_score(y, y_pred)
     f1_val = f1_score(y, y_pred)
     au_val = auc(X, y, model)
     rc_val = recall_score(y, y_pred)
