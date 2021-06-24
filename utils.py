@@ -5,19 +5,13 @@ def auc(X, y, model):
     probs = model.predict_proba(X)[:,1] 
     return roc_auc_score(y, probs)
 
-def auc2(X, y, model):
-    probs = model.decision_function(X)
-    return roc_auc_score(y, probs)
 
 def aps(X, y, model):
     probs = model.predict_proba(X)[:,1]
     return average_precision_score(y, probs)
 
-def aps2(X, y, model):
-    probs = model.decision_function(X)
-    return average_precision_score(y, probs)
 
-def get_metric(X, y, y_pred, model):
+def get_metrics(X, y, y_pred, model):
     """
         Function to calculate the following metrics for evaluating the model:
         Accuracy, F1, ROC-AUC, Recall, Precision, and PR-AUC Scores
@@ -38,7 +32,8 @@ def get_metric(X, y, y_pred, model):
     print('Precision Score: ', pr_val)
     print('PR-AUC Score: ', aps_val)
 
-def sampling(X_train, y_train, X_valid, y_valid, resampling_method, model):
+
+def run_resampling(X_train, y_train, X_valid, y_valid, resampling_method, model):
     """
         Function to run resampling method on training set to produce balanced dataset, 
         to show the count of the majority and minority class of resampled data,
