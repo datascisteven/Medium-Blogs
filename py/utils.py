@@ -1,15 +1,12 @@
-from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score, average_precision_score, roc_auc_score
 from collections import Counter
 from tqdm import tqdm
 from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score, auc, average_precision_score, confusion_matrix, roc_auc_score
 from tqdm import tqdm
-import re
 import pandas as pd
+import numpy as np
 import requests
-from config import keys
-import gensim
-from nltk.stem import WordNetLemmatizer
-from nltk.corpus import stopwords
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def auc(X, y, model):
@@ -92,46 +89,79 @@ def tweets_request(tweets_ids):
     
     return pd.concat(df_lst)
 
-def remove_users(df, col):  
-    df[col] = df[col].apply(lambda x: re.sub(r'(RT\s@[A-Za-z]+[A-Za-z0-9-_]+)', '', str(x))) # remove re-tweet
-    df[col] = df[col].apply(lambda x: re.sub(r'(@[A-Za-z0-9-_]+)', '', str(x))) # remove tweeted at
 
-def remove_special_characters(df, col):
-    df[col] = df[col].apply(lambda x: re.sub(r'&[\S]+?;', '', str(x))) # remove character references
-    df[col] = df[col].apply(lambda x: re.sub(r'[^\w\s]', r'', str(x))) # remove punctuation
 
-def remove_hash(df, col):
-	df[col] = df[col].apply(lambda x: re.sub(r'#', ' ', str(x)))
+def rmse(y, y_pred):
+    return np.sqrt(mean_squared_error(y, y_pred))
 
-def remove_links(df, col):
-    df[col] = df[col].apply(lambda x: re.sub(r'http\S+', '', str(x)))  # remove http links
-    df[col] = df[col].apply(lambda x: re.sub(r'bit.ly/\S+', '', str(x)))  # remove bit.ly links  
+def train_test_metrics(y_train, y_test, y_train_pred, y_test_pred):
+	print('Training R^2 Score: ', round(r2_score(y_train, y_train_pred), 4))
+	print('Training RMSE: %d' % rmse(y_train, y_train_pred))
+	print('Testing R^2 Score: ', round(r2_score(y_test, y_test_pred), 4))
+	print('Testing RMSE: %d' % rmse(y_test, y_test_pred))
+	return
 
-def remove_numerics(df, col):
-    df[col] = df[col].apply(lambda x: re.sub(r'\w*\d\w*', r'', str(x)))
+def get_metrics_confusion(X, y, y_pred, model):
+    """
+        Function to get accuracy, F1, ROC-AUC, recall, precision, PR-AUC scores followed by confusion matrix
+        where X is feature dataset, y is target dataset, and model is instantiated model variable
+    """
+    acc = accuracy_score(y, y_pred)
+    f1 = f1_score(y, y_pred)
+    roc_auc = auc(X, y, model)
+    rec = recall_score(y, y_pred)
+    prec = precision_score(y, y_pred)
+    pr_auc = aps(X, y, model)
 
-def remove_whitespaces(df, col):
-    df[col] = df[col].apply(lambda x: re.sub(r'\s\s+', ' ', str(x))) 
-    df[col] = df[col].apply(lambda x: re.sub(r'(\A\s+|\s+\Z)', '', str(x)))
+    print('Accuracy: ', acc)
+    print('F1 Score: ', f1)
+    print('ROC-AUC: ', roc_auc)
+    print('Recall: ', rec)
+    print('Precision: ', prec)
+    print('PR-AUC: ', pr_auc)
+    
+    cnf = confusion_matrix(y, y_pred)
+    group_names = ['TN','FP','FN','TP']
+    group_counts = ['{0:0.0f}'.format(value) for value in cnf.flatten()]
+    group_percentages = ['{0:.2%}'.format(value) for value in cnf.flatten()/np.sum(cnf)]
+    labels = [f'{v1}\n{v2}\n{v3}' for v1, v2, v3 in zip(group_names, group_counts, group_percentages)]
+    labels = np.asarray(labels).reshape(2,2)
+    fig, ax = plt.subplots(figsize=(4,4))
+    sns.heatmap(cnf, annot=labels, fmt='', cmap='Blues', annot_kws={'size':14}, cbar=False, xticklabels=False, yticklabels=False)
 
-def lemmatize(token):
-    return WordNetLemmatizer().lemmatize(token, pos='v')
+def aps2(X, y, model):
+    """
+        Function to calculate PR-AUC Score based on decision_function(X)
+        where X is feature values, y is target values, and model is instantiated model variable
+    """
+    probs = model.decision_function(X)
+    return average_precision_score(y, probs)
 
-def tokenize(tweet):
-    result = []
-    for token in gensim.utils.simple_preprocess(tweet):
-        if token not in gensim.parsing.preprocessing.STOPWORDS and len(token) > 2:  # drops stopwords and words with <3 characters
-            result.append(lemmatize(token))
-    return result
+def get_metrics_2(X, y, y_pred, model):
+    """
+        Function to get training and validation F1, recall, precision, PR AUC scores
+        Instantiate model and pass the model into function
+        Pass X_train, y_train, X_val, Y_val datasets
+        Pass in calculated model.predict(X) for y_pred
+    """    
+    ac = accuracy_score(y, y_pred)
+    f1 = f1_score(y, y_pred)
+    rc = recall_score(y, y_pred)
+    pr = precision_score(y, y_pred)
+    prauc = aps2(X, y, model)
+    
+    print('Accuracy: ', ac)
+    print('F1: ', f1)
+    print('Recall: ', rc)
+    print('Precision: ', pr)
+    print('PR-AUC: ', prauc)
 
-def tokenize_and_lemmatize(df, col):
-    df[col] = df[col].apply(lambda x: tokenize(x))
-
-def preprocess_tweets(df, col):
-    remove_users(df, col)
-    remove_special_characters(df, col)
-    remove_hash(df, col)
-    remove_links(df, col)
-    remove_numerics(df, col)
-    remove_whitespaces(df, col)
-    tokenize_and_lemmatize(df, col)
+def get_confusion(y, y_pred):
+    cnf = confusion_matrix(y, y_pred)
+    group_names = ['TN','FP','FN','TP']
+    group_counts = ['{0:0.0f}'.format(value) for value in cnf.flatten()]
+    group_percentages = ['{0:.2%}'.format(value) for value in cnf.flatten()/np.sum(cnf)]
+    labels = [f'{v1}\n{v2}\n{v3}' for v1, v2, v3 in zip(group_names, group_counts, group_percentages)]
+    labels = np.asarray(labels).reshape(2,2)
+    fig, ax = plt.subplots(figsize=(4,4))
+    sns.heatmap(cnf, annot=labels, fmt='', cmap='Blues', annot_kws={'size':14}, cbar=False, xticklabels=False, yticklabels=False)

@@ -1,0 +1,6 @@
+,Average Bias,Average Variance,Training R^2 Score,Testing R^2 Score,Training RMSE,Testing RMSE
+Baseline,3.078e+10,1.676e+09,0.8328,0.8147,147801,167382
+Baseline w/Ridge,3.079e+10,1.653e+09,0.8464,0.7729,141645,185283
+Baseline w/Lasso,3.083e+10,1.620e+09,0.8464,0.7729,141647,185285
+Decision Tree Regressor,2.922e+10,2.848e+10,0.9999,0.6293,3466,236718
+Random Forest Regressor,2.927e+10,3.297e+09,0.9157,0.8044,104960,171969
