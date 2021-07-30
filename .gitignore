@@ -128,3 +128,5 @@ dmypy.json
 .DS_Store
 
 data/.DS_Store
+
+Hate-Tweet-Detector-Flask/config.py
