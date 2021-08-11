@@ -18,65 +18,32 @@ def aps(X, y, model):
     probs = model.predict_proba(X)[:,1]
     return average_precision_score(y, probs)
 
-
-def get_metrics(X, y, y_pred, model):
+def auc2(X, y, model):
     """
-        Function to calculate the following metrics for evaluating the model:
-        Accuracy, F1, ROC-AUC, Recall, Precision, and PR-AUC Scores
-
-        Need to enter X_valid, y_valid, y_pred, and model
+        Function to calculate ROC-AUC Score based on decision_function(X)
+        where X is feature values, y is target values, and model is instantiated model variable
     """
-    ac_val = accuracy_score(y, y_pred)
-    f1_val = f1_score(y, y_pred)
-    au_val = auc(X, y, model)
-    rc_val = recall_score(y, y_pred)
-    pr_val = precision_score(y, y_pred)
-    aps_val = aps(X, y, model)
+    probs = model.decision_function(X)
+    return roc_auc_score(y, probs)
 
-    print('Accuracy Score: ', ac_val)
-    print('F1 Score: ', f1_val)
-    print('ROC-AUC Score: ', au_val)
-    print('Recall Score: ', rc_val)
-    print('Precision Score: ', pr_val)
-    print('PR-AUC Score: ', aps_val)
-
-
-def run_resampling(X_train, y_train, X_valid, y_valid, resampling_method, model):
+def aps2(X, y, model):
     """
-        Function to run resampling method on training set to produce balanced dataset, 
-        to show the count of the majority and minority class of resampled data,
-        to train provided model on training data and evaluate metrics on validation data
-
-        Need to enter X_train, y_train, X_valid, y_valid, resampling_method, and model
+        Function to calculate PR-AUC Score based on decision_function(X)
+        where X is feature values, y is target values, and model is instantiated model variable
     """
-    X_train_resampled, y_train_resampled = resampling_method.fit_resample(X_train, y_train)
-    print("Training Count: ", Counter(y_train_resampled))
-    new_model = model.fit(X_train_resampled, y_train_resampled)
-    y_pred = new_model.predict(X_valid)
-    get_metrics(X_valid, y_valid, y_pred, new_model)
-
+    probs = model.decision_function(X)
+    return average_precision_score(y, probs)
 
 def group_list(lst, size=100):
-    """
-    Generate batches of 100 ids in each
-    Returns list of strings with , seperated ids
-    """
     new_list =[]
     idx = 0
     while idx < len(lst):        
-        new_list.append(
-            ','.join([str(item) for item in lst[idx:idx+size]])
-        )
+        new_list.append(','.join([str(item) for item in lst[idx:idx+size]]))
         idx += size
     return new_list
 
-
 def tweets_request(tweets_ids):
-    """
-    Make a request to Tweeter API
-    """
-    df_lst = []
-    
+    lst = []
     for batch in tqdm(tweets_ids):
         url = "https://api.twitter.com/2/tweets?ids={}&&tweet.fields=created_at,entities,geo,id,public_metrics,text&user.fields=description,entities,id,location,name,public_metrics,username".format(batch)
         payload={}
@@ -85,21 +52,35 @@ def tweets_request(tweets_ids):
         r = requests.request("GET", url, headers=headers, data=payload)
         data = r.json()
         if 'data' in data.keys():
-            df_lst.append(pd.DataFrame(data['data']))
-    
-    return pd.concat(df_lst)
+            lst.append(pd.DataFrame(data['data']))
+    return pd.concat(lst)
 
+def preprocess(tweet):
+    result = re.sub(r'(RT\s@[A-Za-z]+[A-Za-z0-9-_]+)', '', tweet)
+    result = re.sub(r'(@[A-Za-z0-9-_]+)', '', result)
+    result = re.sub(r'http\S+', '', result)
+    result = re.sub(r'bit.ly/\S+', '', result)
+    result = re.sub(r'(.)\1+', r'\1\1', result)
+    result = " ".join(re.findall('[A-Z][^A-Z]*', result)) 
+    result = re.sub(r'&[\S]+?;', '', result)
+    result = re.sub(r'#', ' ', result)
+    result = re.sub(r'[^\w\s]', r'', result)    
+    result = re.sub(r'\w*\d\w*', r'', result)
+    result = re.sub(r'\s\s+', ' ', result)
+    result = re.sub(r'(\A\s+|\s+\Z)', '', result)
+    result = tokenize(result)
+    return result 
 
+def lemmatize(token):
+    return WordNetLemmatizer().lemmatize(token, pos='v')
 
-def rmse(y, y_pred):
-    return np.sqrt(mean_squared_error(y, y_pred))
-
-def train_test_metrics(y_train, y_test, y_train_pred, y_test_pred):
-	print('Training R^2 Score: ', round(r2_score(y_train, y_train_pred), 4))
-	print('Training RMSE: %d' % rmse(y_train, y_train_pred))
-	print('Testing R^2 Score: ', round(r2_score(y_test, y_test_pred), 4))
-	print('Testing RMSE: %d' % rmse(y_test, y_test_pred))
-	return
+def tokenize(tweet):
+    result = []
+    for token in gensim.utils.simple_preprocess(tweet):
+        if token not in gensim.parsing.preprocessing.STOPWORDS and len(token) > 2:  # drops stopwords and words with <3 characters
+            result.append(lemmatize(token))
+    result = ' '.join(result)
+    return result
 
 def get_metrics_confusion(X, y, y_pred, model):
     """
@@ -129,15 +110,8 @@ def get_metrics_confusion(X, y, y_pred, model):
     fig, ax = plt.subplots(figsize=(4,4))
     sns.heatmap(cnf, annot=labels, fmt='', cmap='Blues', annot_kws={'size':14}, cbar=False, xticklabels=False, yticklabels=False)
 
-def aps2(X, y, model):
-    """
-        Function to calculate PR-AUC Score based on decision_function(X)
-        where X is feature values, y is target values, and model is instantiated model variable
-    """
-    probs = model.decision_function(X)
-    return average_precision_score(y, probs)
 
-def get_metrics_2(X, y, y_pred, model):
+def get_metrics_confusion_2(X, y, y_pred, model):
     """
         Function to get training and validation F1, recall, precision, PR AUC scores
         Instantiate model and pass the model into function
@@ -148,15 +122,16 @@ def get_metrics_2(X, y, y_pred, model):
     f1 = f1_score(y, y_pred)
     rc = recall_score(y, y_pred)
     pr = precision_score(y, y_pred)
+    rocauc = auc2(X, y, model)
     prauc = aps2(X, y, model)
     
     print('Accuracy: ', ac)
     print('F1: ', f1)
     print('Recall: ', rc)
     print('Precision: ', pr)
+    print('ROC-AUC: ', rocauc)
     print('PR-AUC: ', prauc)
 
-def get_confusion(y, y_pred):
     cnf = confusion_matrix(y, y_pred)
     group_names = ['TN','FP','FN','TP']
     group_counts = ['{0:0.0f}'.format(value) for value in cnf.flatten()]
